@@ -9,6 +9,7 @@ struct CommandEntry {
     int dep1;
     int dep2;
     bool is_exit;
+    int longest_depth;
 };
 
 int array_size;
@@ -26,12 +27,21 @@ ProgCtx analyzeProg(const unsigned int opsLatency[], const InstInfo progTrace[],
         command_array[i].is_exit = true;
         command_array[i].cycles = opsLatency[progTrace[i].opcode];
         command_array[i].dep1 = regs[progTrace[i].src1Idx];
+        command_array[i].longest_depth = 0;
         if(command_array[i].dep1 != -1){
             command_array[command_array[i].dep1].is_exit = false;
+            int potential_longest_depth = command_array[command_array[i].dep1].longest_depth + command_array[command_array[i].dep1].cycles;
+            if(potential_longest_depth > command_array[i].longest_depth){
+                command_array[i].longest_depth = potential_longest_depth;
+            }
         }
         command_array[i].dep2 = regs[progTrace[i].src2Idx];
         if(command_array[i].dep2 != -1){
             command_array[command_array[i].dep2].is_exit = false;
+            int potential_longest_depth = command_array[command_array[i].dep2].longest_depth + command_array[command_array[i].dep2].cycles;
+            if(potential_longest_depth > command_array[i].longest_depth){
+                command_array[i].longest_depth = potential_longest_depth;
+            }
         }
         regs[progTrace[i].dstIdx] = i;
     }
@@ -46,44 +56,31 @@ void freeProgCtx(ProgCtx ctx) {
 
 }
 
-int aux_getInstDepth(ProgCtx ctx, unsigned int theInst) {
-
-    struct CommandEntry* command_array =  (struct CommandEntry*)ctx;
-    int depth1 =  command_array[theInst].cycles, depth2 =  command_array[theInst].cycles;
-
-    if(command_array[theInst].dep1 != -1){
-        depth1 =  command_array[theInst].cycles + aux_getInstDepth(ctx, command_array[theInst].dep1);
-    }
-
-    if(command_array[theInst].dep2 != -1){
-        depth2 =  command_array[theInst].cycles + aux_getInstDepth(ctx, command_array[theInst].dep2);
-    }
-
-    if(depth1 > depth2){
-        return depth1;
-    }else{
-        return depth2;
-    }
-}
+//int aux_getInstDepth(ProgCtx ctx, unsigned int theInst) {
+//
+//    struct CommandEntry* command_array =  (struct CommandEntry*)ctx;
+//    int depth1 =  command_array[theInst].cycles, depth2 =  command_array[theInst].cycles;
+//
+//    if(command_array[theInst].dep1 != -1){
+//        depth1 =  command_array[theInst].cycles + aux_getInstDepth(ctx, command_array[theInst].dep1);
+//    }
+//
+//    if(command_array[theInst].dep2 != -1){
+//        depth2 =  command_array[theInst].cycles + aux_getInstDepth(ctx, command_array[theInst].dep2);
+//    }
+//
+//    if(depth1 > depth2){
+//        return depth1;
+//    }else{
+//        return depth2;
+//    }
+//}
 
 int getInstDepth(ProgCtx ctx, unsigned int theInst) {
 
     struct CommandEntry* command_array =  (struct CommandEntry*)ctx;
-    int depth1 = 0, depth2 = 0;
+    return command_array[theInst].longest_depth;
 
-    if(command_array[theInst].dep1 != -1){
-        depth1 = aux_getInstDepth(ctx, command_array[theInst].dep1);
-    }
-
-    if(command_array[theInst].dep2 != -1){
-        depth2 = aux_getInstDepth(ctx, command_array[theInst].dep2);
-    }
-
-    if(depth1 > depth2){
-        return depth1;
-    }else{
-        return depth2;
-    }
 }
 
 int getInstDeps(ProgCtx ctx, unsigned int theInst, int *src1DepInst, int *src2DepInst) {
@@ -108,7 +105,7 @@ int getProgDepth(ProgCtx ctx) {
 
     for (int i = 0; i < array_size; ++i) {
         if(command_array[i].is_exit){
-            int current_depth = aux_getInstDepth(ctx, i);
+            int current_depth = command_array[i].longest_depth + command_array[i].cycles;
             if(current_depth > max_depth){
                 max_depth = current_depth;
             }
